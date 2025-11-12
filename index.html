@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+    content="Beyond Cosine Similarity: Magnitude-Aware CLIP for No-Reference Image Quality Assessment">
+  <meta name="keywords" content="Image quality assessment, Diffusion Model, Training-free">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beyond Cosine Similarity: Magnitude-Aware CLIP for No-Reference Image Quality Assessment</title>
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'G-PYVRSFMDRL');
+  </script>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <!-- <link rel="icon" href="./static/images/favicon.svg"> -->
+
+  <!-- 原有 CSS 引用不变 -->
+  <link rel="stylesheet" href="./static/css/index.css">
+
+  <!-- 添加以下自定义 CSS，解决间距过大问题 -->
+  <style>
+    /* 减小 section 标签的上下内边距（默认 3rem 改为 1.5rem） */
+    .section {
+      padding-top: 1.5rem !important;
+      padding-bottom: 1.5rem !important;
+    }
+
+    /* 减小 .content 类的上下外边距，消除段前多余间距 */
+    .content {
+      margin-top: 0.5rem !important;
+      margin-bottom: 0.5rem !important;
+    }
+
+    /* 消除图片与上方文字的默认空白间距，同时控制图片上下间距 */
+    .content img {
+      margin-top: 0.8rem !important;
+      margin-bottom: 0.8rem !important;
+      display: block; /* 消除 inline-block 带来的额外空白 */
+      margin-left: auto; /* 保持图片水平居中（如果需要） */
+      margin-right: auto;
+    }
+
+    /* 减小标题与下方内容的间距 */
+    .title.is-3 {
+      margin-bottom: 1rem !important;
+    }
+  </style>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+  <script src="./static/js/script.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <!-- <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script> -->
+</head>
+
+<body>
+
+  <section class="hero">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered">
+          <div class="column has-text-centered">
+            <h1 class="title is-1 publication-title"><span style="color: #228be6;font-weight: bolder;"></span>Beyond Cosine Similarity: Magnitude-Aware CLIP for No-Reference Image Quality Assessment</h1>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+                <a href="https://github.com/zhix000?tab=repositories">Zhicheng Liao</a><sup>1</sup><sup>*</sup>,</span>
+              <span class="author-block">
+                <a href="">Dongxu Wu</a><sup>2</sup><sup>*</sup>,</span>
+              <span class="author-block">
+                <a href="">Zhenshan Shi</a><sup>2</sup><sup>*</sup>,</span>
+              <span class="author-block">
+                  <a href="https://scholar.google.com/citations?hl=zh-CN&user=pLHqgLIAAAAJ">Sijie Mai</a><sup>4</sup>,</span>
+              <span class="author-block">
+                <a href="https://dblp.org/pid/214/8898.html">Hanwei Zhu</a><sup>4</sup>,</span>
+              <span class="author-block">
+                <a href="https://github.com/lingyzhu0101">Lingyu Zhu</a><sup>1</sup>,</span>
+              <span class="author-block">
+                <a href="https://openreview.net/profile?id=~Yuncheng_Jiang1">Yuncheng Jiang</a><sup>5</sup>,</span>
+              <span class="author-block">
+                <a href="https://scholar.google.com/citations?hl=zh-CN&user=w_WL27oAAAAJ">Baoliang Chen</a><sup>2</sup>,</span>
+              <span class="author-block">
+            </div>
+
+            <div class="is-size-5 publication-authors">
+              <span class="author-block"><sup>1</sup>South China Normal University, China</span>
+              <span class="author-block"><sup>2</sup>Nanyang Technological University, Singapore</span>
+              <span class="author-block"><sup>3</sup>City University of Hong Kong, China</span><br>
+              <span class="author-block"><sup>*</sup>denotes Corresponding author</span>
+            </div>
+            <!-- TODO: update paper and video link once upload -->
+            <div class="column has-text-centered">
+              <!-- <div class="publication-links"> -->
+                <!-- PDF Link. -->
+                <span class="link-block">
+                <a href="https://arxiv.org/pdf/2407.14900"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+                </span>
+                <span class="link-block">
+                <a href="https://arxiv.org/pdf/2407.14900"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+                <!-- Video Link. -->
+                <!-- <span class="link-block">
+                  <a href="https://youtu.be/470hul75bSM" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-youtube"></i>
+                    </span>
+                    <span>Video</span>
+                  </a>
+                </span> -->
+                <!-- Code Link. -->
+                <span class="link-block">
+                  <a href="https://github.com/zhix000/MA-CLIP"
+                    class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon">
+                      <i class="fab fa-github"></i>
+                    </span>
+                    <span>Code</span>
+                  </a>
+                </span>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Overview</h2>
+          <div class="content has-text-justified">
+            <img src="./static/images/intro.png">
+
+            <p>
+              Recent efforts have repurposed the Contrastive Language-Image Pre-training (CLIP) model for No-Reference Image Quality Assessment (NR-IQA) 
+              by measuring the cosine similarity between the image embedding and textual prompts such as ``a good photo” or ``a bad photo.” 
+              However, this semantic similarity overlooks a critical yet underexplored cue: <b>the magnitude of the CLIP image features, which we empirically 
+              find to exhibit a strong correlation with perceptual quality.</b>  As illustrated in Fig.1(a), images with widely varying MOS often yield nearly identical prompt-based similarities, 
+              failing to capture true perceptual differences. In contrast, the feature magnitude varies consistently with MOS, increasing for higher-quality images and decreasing for lower-quality ones.
+               Moreover, we observe that cosine-based scores are more reliable in distinguishing high-quality images, where semantic features remain well aligned with CLIP’s pretrained distribution, 
+               while magnitude cues are more sensitive and consistent in low-quality regimes, where distortions cause semantic misalignment (see Fig.1(b)). T
+               his insight suggests a key conclusion: <b>cosine similarity and feature magnitude are complementary.</b>
+            </p>
+            <p>
+              Motivated by this, we propose to leverage both cues jointly rather than relying on either alone. In this work, we introduce a novel adaptive fusion framework 
+              that complements cosine similarity with a magnitude-aware quality cue. 
+              Specifically, we first extract the absolute CLIP image features and apply a Box-Cox transformation to statistically normalize the feature distribution 
+              and mitigate semantic sensitivity. The resulting scalar summary serves as a semantically-normalized auxiliary cue that complements cosine-based prompt matching. 
+              To integrate both cues effectively, we further design a confidence-guided fusion scheme that adaptively weighs each term according to its relative strength.
+              Extensive experiments on multiple benchmark IQA datasets demonstrate that our method consistently outperforms standard CLIP-based IQA and state-of-the-art 
+              baselines, <b>without any task-specific training</b>.
+            </p>
+
+          </div>
+        </div>
+      </div>
+      <!--/ Abstract. -->
+
+      <!-- Paper video. -->
+      <!-- <div class="columns is-centered has-text-centered">
+        <div class="column is-four-fifths">
+          <h2 class="title is-3">Video</h2>
+          <div class="publication-video">
+            <iframe width="560" height="315" src="https://www.youtube.com/embed/470hul75bSM?si=7F9NL8zWbU9GtqHb"
+              title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; 
+           encrypted-media; " allowfullscreen></iframe>
+           
+          </div>
+        </div>
+      </div> -->
+    </div>
+  </section>
+
+
+
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <!-- Concurrent Work. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-full-width">
+          <h2 class="title is-3">Method</h2>
+          <div class="content has-text-justified">
+            <img src="./static/images/frame.png">
+
+            <p>Overview of the Proposed Magnitude-Aware CLIP IQA Framework. Given an input image, we extract its CLIP image embedding and compute two quality signals: 
+              (1) \(Q_{\text{sim}}\), the image semantic similarity with text prompts, and (2) \(Q_{\text{mag}}\), a magnitude-based score obtained via Box-Cox 
+              transformation for statistical normalization. To adaptively balance these complementary cues, we compute a confidence discrepancy and generate softmax-based 
+              fusion weights, producing the final quality prediction \(Q\).</p>
+
+          </div>
+        </div>
+      </div>
+      <!--/ Concurrent Work. -->
+
+    </div>
+  </section>
+
+
+
+  <section class="section">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column is-full-width">
+          <h2 class="title is-3">Result</h2>
+          <div class="content has-text-justified">
+            <img src="./static/images/tab1.png">
+            <!-- <p>Result on SICE datasets</p> -->
+            <div class="has-text-centered">
+              <img src="./static/images/vis.png" style="width: auto; height: auto; max-width: 85%;">
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
+  <section class="section">
+    <div class="container">
+      <div class="has-text-centered">
+        <h2 class="title is-3">Qualitative Visualization</h2>
+        <div class="content has-text-justified max-w-3xl mx-auto mb-8">
+          <p>(left) Semantic Bias exists in CLIP feature. This feature magnitudes for visually similar-quality images differ substantially across semantic categories. 
+            Statistical normalization is necessary to make magnitude cues reliable. WD represents the Wasserstein Distance between two Feature distribution. (left) 
+            and the result generated by our method (right).</p>
+          <p>(right) Scatter plot comparison of CLIP-IQA and MA-CLIP. The x-axis represents the MOS, while the y-axis shows the prediction. 
+            As the scatter gets closer to the ideal line, it indicates that the model predicts better.</p>
+        </div>
+  
+        <!-- 第一组对比（带卡片质感+统一风格） -->
+        <div class="columns is-centered gap-6">
+          <!-- 左侧图片卡片 -->
+          <div class="column is-half max-w-md">
+            <div class="card shadow-lg rounded-xl overflow-hidden hover:shadow-xl transition-shadow duration-300">
+              <div class="card-image">
+                <img 
+                  src="./static/images/vis1.png" 
+                  alt="Ours Result" 
+                  class="image is-fullwidth object-cover"
+                  style="height: 300px; object-fit: contain; background: #f8f9fa;"
+                >
+              </div>
+              <div class="card-footer bg-white justify-center py-3">
+                <p class="card-footer-item has-text-weight-semibold text-gray-700">Ours</p>
+              </div>
+            </div>
+          </div>
+  
+          <!-- 右侧图片卡片 -->
+          <div class="column is-half max-w-md">
+            <div class="card shadow-lg rounded-xl overflow-hidden hover:shadow-xl transition-shadow duration-300">
+              <div class="card-image">
+                <img 
+                  src="./static/images/vis2.png" 
+                  alt="Red Scatters-Ours" 
+                  class="image is-fullwidth object-cover"
+                  style="height: 300px; object-fit: contain; background: #f8f9fa;"
+                >
+              </div>
+              <div class="card-footer bg-white justify-center py-3">
+                <p class="card-footer-item has-text-weight-semibold text-gray-700">Red Scatters-Ours</p>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- 可选：添加第二组对比（保持风格一致） -->
+        <!-- <div class="columns is-centered gap-6 mt-8">
+          <div class="column is-half max-w-md">
+            <div class="card shadow-lg rounded-xl overflow-hidden hover:shadow-xl transition-shadow duration-300">
+              <div class="card-image">
+                <img src="./static/images/1.jpg" alt="Input" class="image is-fullwidth object-cover" style="height: 300px; object-fit: contain; background: #f8f9fa;">
+              </div>
+              <div class="card-footer bg-white justify-center py-3">
+                <p class="card-footer-item has-text-weight-semibold text-gray-700">Input</p>
+              </div>
+            </div>
+          </div>
+          <div class="column is-half max-w-md">
+            <div class="card shadow-lg rounded-xl overflow-hidden hover:shadow-xl transition-shadow duration-300">
+              <div class="card-image">
+                <img src="./static/images/1 (1).jpg" alt="Ours" class="image is-fullwidth object-cover" style="height: 300px; object-fit: contain; background: #f8f9fa;">
+              </div>
+              <div class="card-footer bg-white justify-center py-3">
+                <p class="card-footer-item has-text-weight-semibold text-gray-700">Ours</p>
+              </div>
+            </div>
+          </div>
+        </div> -->
+      </div>
+    </div>
+  </section>
+  
+  <!-- 可选：添加自定义样式（若需调整颜色/间距） -->
+  <style>
+    /* 图片卡片悬停效果增强 */
+    .card:hover {
+      transform: translateY(-4px);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    /* 统一文字颜色和字体 */
+    .card-footer-item {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1rem;
+    }
+    /* 响应式调整：移动端图片高度自适应 */
+    @media (max-width: 768px) {
+      .card-image img {
+        height: auto !important;
+      }
+      .columns.gap-6 {
+        gap: 3rem !important;
+      }
+    }
+  </style>
+
+  </script>
+
+  <!-- 
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Related Links</h2>
+
+        <div class="content has-text-justified">
+          <p>
+            Needs update
+          </p>
+         
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section> -->
+
+  
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@misc{liao2025beyond,
+  Author = {Liao, Zhicheng and Wu, Dongxu and Shi, Zhenshan and Mai, Sijie and Zhu, Hanwei and Zhu, Lingyu and Jiang, Yuncheng and Chen, Baoliang},
+  Title  = {Beyond Cosine Similarity: Magnitude-Aware CLIP for No-Reference Image Quality Assessment},
+  year      ={2025}, 
+  eprint    ={2407.14900}, 
+  archivePrefix={arXiv}, 
+  primaryClass={cs.CV},
+}</code></pre>
+  </div>
+</section>
+
+  <!-- TODO: update the arxiv link and github -->
+  <footer class="footer">
+    <div class="container">
+      <div class="content has-text-centered">
+        <a class="icon-link" href="https://arxiv.org/pdf/2407.14900.pdf">
+          <i class="fas fa-file-pdf"></i>
+        </a>
+        <a class="icon-link" href="https://maclip.github.io/" class="external-link" disabled>
+          <i class="fab fa-github"></i>
+        </a>
+      </div>
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+              We thank the authors of <a href="https://nerfies.github.io/">Nerfies</a> that kindly open sourced the template of this website.
+              <!-- This website is licensed under a <a rel="license"
+                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
+                Commons Attribution-ShareAlike 4.0 International License</a>. -->
+            </p>
+            <p>
+              <!-- This means you are free to borrow the <a href="https://github.com/nerfies/nerfies.github.io">source
+                code</a> of this website,
+              we just ask that you link back to this page in the footer.
+              Please remember to remove the analytics code included in the header of the website which
+              you do not want on your website. -->
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>
