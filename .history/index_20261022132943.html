@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plug In, Grade Right: Psychology-Inspired AGIQA</title>
+<meta name="description" content="AGQG: A psychology-inspired, pluggable Graded Response Model for AI-Generated Image Quality Assessment. Enforcing unimodal, interpretable quality distributions.">
+
+<!--
+  ============================================================
+  项目主页 · ICML / CVPR / NeurIPS 风格
+  目录结构：
+    index.html
+    figures/fig1.pdf
+    figures/fig2.pdf
+    figures/fig3.pdf
+    figures/fig4.pdf
+    figures/fig5.pdf
+  说明：
+    1. 所有插图均为 PDF，通过 PDF.js 渲染为高清 Canvas（矢量级清晰度）。
+    2. PDF.js 需要 HTTP(S) 同源访问。请运行：python -m http.server 8000
+       然后访问 http://localhost:8000 。直接双击打开时会自动回退为浏览器原生 PDF 预览。
+    3. Interactive AGRM Explorer 使用 Chart.js 实时绘制：
+         累积概率曲线 P*_k(θ)、类别响应曲线 P_k(θ)、当前 θ 的概率分布。
+    4. 若需替换论文文件名，请同步修改 data-pdf / iframe src / a href 三处。
+  ============================================================
+-->
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- MathJax -->
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+  options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] },
+  svg: { fontCache: 'global' }
+};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<!-- Chart.js (交互概率曲线) -->
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<!-- PDF.js (PDF 高清渲染) -->
+<script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+
+<style>
+/* ==================== Design Tokens ==================== */
+:root{
+  --ink:#0f172a;
+  --body:#334155;
+  --muted:#64748b;
+  --faint:#94a3b8;
+  --line:#e2e8f0;
+  --line-soft:#eef2f7;
+  --bg:#ffffff;
+  --soft:#f8fafc;
+  --accent:#2563eb;
+  --accent-dark:#1d4ed8;
+  --accent-soft:#eff6ff;
+  --green:#059669;
+  --green-soft:#ecfdf5;
+  --red:#dc2626;
+  --red-soft:#fef2f2;
+  --amber:#d97706;
+  --radius:14px;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.04);
+  --shadow:0 4px 24px -12px rgba(15,23,42,.18);
+  --shadow-lg:0 20px 50px -24px rgba(15,23,42,.28);
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:88px}
+body{
+  margin:0;background:var(--bg);color:var(--body);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent-dark)}
+img,canvas,iframe{max-width:100%}
+button,select,input{font-family:inherit}
+::selection{background:#dbeafe;color:#0f172a}
+:focus-visible{outline:3px solid #93c5fd;outline-offset:3px;border-radius:6px}
+.wrap{max-width:1140px;margin:0 auto;padding:0 28px}
+.prose{max-width:880px;margin:0 auto}
+.mono{font-family:var(--mono)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+[hidden]{display:none !important}
+
+/* ==================== Progress + Nav ==================== */
+.progress-bar{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,#2563eb,#06b6d4);z-index:1000;transition:width .1s linear}
+.nav{
+  position:sticky;top:0;z-index:100;height:64px;
+  background:rgba(255,255,255,.86);backdrop-filter:saturate(180%) blur(14px);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--line-soft);
+}
+.nav-inner{max-width:1140px;margin:0 auto;padding:0 28px;height:100%;display:flex;align-items:center;gap:24px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.02em;color:var(--ink);font-size:1.05rem;flex-shrink:0}
+.brand svg{width:26px;height:26px}
+.nav-links{display:flex;gap:4px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-links a{
+  color:var(--muted);font-size:.84rem;font-weight:500;padding:7px 11px;border-radius:8px;
+  white-space:nowrap;transition:background .2s,color .2s;
+}
+.nav-links a:hover{background:var(--soft);color:var(--ink)}
+.nav-links a.active{background:var(--accent-soft);color:var(--accent)}
+.nav-badge{
+  flex-shrink:0;font-family:var(--mono);font-size:.7rem;color:var(--muted);
+  border:1px solid var(--line);padding:5px 9px;border-radius:6px;
+}
+
+/* ==================== Hero ==================== */
+.hero{
+  position:relative;text-align:center;padding:64px 0 40px;
+  background:
+    radial-gradient(900px 320px at 50% -80px,rgba(37,99,235,.09),transparent 70%),
+    linear-gradient(180deg,#f8fbff 0%,#ffffff 100%);
+  border-bottom:1px solid var(--line-soft);overflow:hidden;
+}
+.hero::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(rgba(148,163,184,.22) 1px,transparent 1px);
+  background-size:26px 26px;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.5),transparent 65%);
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.5),transparent 65%);
+}
+.hero>*{position:relative}
+.conference-badge{
+  display:inline-flex;align-items:center;gap:8px;font-size:.72rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
+  background:#fff;border:1px solid #dbeafe;border-radius:999px;padding:6px 14px;margin-bottom:24px;
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+h1.paper-title{
+  font-size:clamp(1.9rem,4.6vw,3.05rem);line-height:1.2;font-weight:800;
+  letter-spacing:-.035em;color:var(--ink);margin:0 auto 22px;max-width:940px;
+}
+.authors{font-size:1.06rem;font-weight:500;color:var(--ink);margin-bottom:12px}
+.authors a{color:var(--ink);border-bottom:1px solid transparent;transition:border-color .2s,color .2s}
+.authors a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.authors sup{color:var(--accent);font-size:.68em;font-weight:600;margin-left:2px}
+.affiliations{font-size:.9rem;color:var(--muted);margin-bottom:8px}
+.affiliations sup{color:var(--accent);margin-right:3px}
+.venue-line{font-size:.82rem;color:var(--faint);margin-top:10px}
+.badges{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:28px 0 8px}
+.badge{
+  display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:999px;
+  font-size:.86rem;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink);
+  transition:transform .2s,box-shadow .2s,background .2s;box-shadow:var(--shadow-sm);
+}
+.badge:hover{transform:translateY(-2px);box-shadow:var(--shadow);color:var(--ink)}
+.badge.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.badge.primary:hover{background:var(--accent-dark);color:#fff}
+.badge.dark{background:#0f172a;border-color:#0f172a;color:#fff}
+.badge.dark:hover{background:#1e293b;color:#fff}
+.badge.green{background:var(--green-soft);border-color:#a7f3d0;color:#047857}
+.badge svg{width:15px;height:15px;flex-shrink:0}
+
+/* ==================== Highlight Strip ==================== */
+.highlights{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:36px auto 0;max-width:900px;
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);
+}
+.highlight{padding:22px 16px;text-align:center}
+.highlight+.highlight{border-left:1px solid var(--line-soft)}
+.highlight .num{font-size:1.8rem;font-weight:800;letter-spacing:-.04em;color:var(--accent);line-height:1.2}
+.highlight .num.green{color:var(--green)}
+.highlight .num.ink{color:var(--ink)}
+.highlight .lbl{font-size:.76rem;color:var(--muted);margin-top:6px}
+
+/* ==================== Sections ==================== */
+section{padding:56px 0 8px;scroll-margin-top:80px}
+.section-head{margin-bottom:24px}
+.kicker{
+  display:flex;align-items:center;gap:10px;font-size:.7rem;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;
+}
+.kicker .index{font-family:var(--mono);color:var(--faint);font-weight:500}
+.kicker::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,var(--line),transparent);margin-left:6px}
+h2.section-title{font-size:1.7rem;font-weight:700;letter-spacing:-.025em;color:var(--ink);margin:0 0 6px;line-height:1.35}
+.section-sub{color:var(--muted);font-size:.92rem;margin:0}
+p{margin:0 0 16px}
+.lead{font-size:1.02rem;color:var(--body);text-align:justify}
+.keywords{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.chip{font-size:.72rem;font-family:var(--mono);color:var(--muted);background:var(--soft);border:1px solid var(--line);padding:4px 10px;border-radius:6px}
+.callout{
+  display:flex;gap:14px;padding:18px 20px;background:var(--accent-soft);
+  border:1px solid #dbeafe;border-left:3px solid var(--accent);border-radius:10px;margin:24px 0;
+  font-size:.92rem;color:#1e3a8a;
+}
+.callout .icon{font-size:1.1rem;line-height:1.6}
+.callout strong{color:#1e40af}
+
+/* ==================== PDF Figure ==================== */
+.paper-figure{
+  margin:28px 0 36px;background:#fff;border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+}
+.figure-toolbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:10px 16px;background:var(--soft);border-bottom:1px solid var(--line);
+}
+.figure-label{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:600;color:var(--body)}
+.pdf-tag{font-family:var(--mono);font-size:.62rem;font-weight:600;color:var(--accent);background:#dbeafe;padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.figure-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tool-btn{
+  min-width:28px;height:28px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:#fff;border-radius:6px;color:var(--body);
+  font-size:.8rem;cursor:pointer;transition:background .15s,border-color .15s;
+}
+.tool-btn:hover:not(:disabled){background:var(--accent-soft);border-color:#bfdbfe;color:var(--accent)}
+.tool-btn:disabled{opacity:.35;cursor:not-allowed}
+.tool-select{height:28px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--body);font-size:.75rem;padding:0 6px}
+.page-indicator{font-family:var(--mono);font-size:.72rem;color:var(--muted);min-width:44px;text-align:center}
+.tool-sep{width:1px;height:16px;background:var(--line);margin:0 4px}
+.open-pdf{font-size:.75rem;font-weight:600;color:var(--accent);padding:5px 8px;border-radius:6px}
+.open-pdf:hover{background:var(--accent-soft)}
+.pdf-body{position:relative;background:#eef2f6}
+.pdf-native{display:block;width:100%;height:600px;border:0;background:#eef2f6}
+.pdf-viewport{overflow:auto;max-height:820px;padding:20px;background:#e9eef4}
+.pdf-stage{width:100%;position:relative;min-height:260px}
+.pdf-stage canvas{display:block;margin:0 auto;background:#fff;box-shadow:0 4px 20px rgba(15,23,42,.12);border-radius:2px}
+.pdf-overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;background:rgba(248,250,252,.94);color:var(--muted);font-size:.85rem;text-align:center;padding:24px;
+}
+.spinner{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pdf-note{padding:8px 16px;font-size:.72rem;color:var(--muted);background:var(--soft);border-top:1px solid var(--line)}
+figure figcaption{
+  padding:16px 24px 20px;font-size:.86rem;line-height:1.7;color:var(--muted);text-align:center;
+  background:#fff;border-top:1px solid var(--line-soft);
+}
+figure figcaption strong{color:var(--ink);font-weight:600}
+
+/* ==================== Interactive Explorer ==================== */
+.explorer-intro{max-width:880px}
+.formula-panel{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0;
+  padding:20px;background:var(--soft);border:1px solid var(--line);border-radius:var(--radius);
+}
+.formula-tile{text-align:center;min-width:0}
+.formula-tile .f-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);font-weight:600;margin-bottom:6px}
+.formula-tile .f-math{font-size:.95rem;overflow-x:auto;padding:4px 0;color:var(--ink)}
+.explorer-shell{
+  border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden;box-shadow:var(--shadow-lg);
+}
+.explorer-topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:14px 20px;background:#0f172a;color:#fff;
+}
+.explorer-topbar .title{display:flex;align-items:center;gap:10px;font-size:.86rem;font-weight:600}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.15);animation:pulse 2.4s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(52,211,153,0)}}
+.preset-group{display:flex;gap:6px;flex-wrap:wrap}
+.preset-btn{
+  border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#cbd5e1;
+  font-size:.72rem;font-weight:500;padding:6px 11px;border-radius:999px;cursor:pointer;transition:all .18s;
+}
+.preset-btn:hover{background:rgba(255,255,255,.14);color:#fff}
+.preset-btn.active{background:#fff;color:#0f172a;border-color:#fff}
+.explorer-grid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px;padding:22px}
+.control-panel{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:18px}
+.panel-title{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--faint);margin:0 0 14px}
+.k-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:16px;border-bottom:1px dashed var(--line)}
+.k-row label{font-size:.85rem;font-weight:500;color:var(--ink)}
+.k-row select{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-size:.85rem;color:var(--ink);cursor:pointer}
+.slider-row{margin-bottom:18px}
+.slider-row:last-of-type{margin-bottom:8px}
+.slider-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
+.slider-head label{font-size:.83rem;color:var(--body);font-weight:500}
+.slider-head output{
+  font-family:var(--mono);font-size:.78rem;font-weight:600;color:var(--accent);
+  background:var(--accent-soft);border:1px solid #dbeafe;border-radius:6px;padding:2px 8px;min-width:52px;text-align:center;
+}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:999px;cursor:pointer;
+  background:linear-gradient(to right,var(--accent) 0%,var(--accent) var(--pct,50%),#e2e8f0 var(--pct,50%),#e2e8f0 100%);
+  outline:none;margin:6px 0;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#fff;
+  border:3px solid var(--accent);box-shadow:0 2px 6px rgba(37,99,235,.25);transition:transform .15s;
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 2px 6px rgba(37,99,235,.25)}
+.slider-bounds{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.64rem;color:var(--faint);margin-top:2px}
+.reset-btn{
+  width:100%;margin-top:16px;padding:9px;border:1px solid var(--line);background:#fff;border-radius:8px;
+  font-size:.8rem;font-weight:500;color:var(--body);cursor:pointer;transition:all .18s;
+}
+.reset-btn:hover{border-color:#bfdbfe;color:var(--accent);background:var(--accent-soft)}
+.chart-stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.chart-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px 10px;background:#fff;min-width:0}
+.chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.chart-head h4{margin:0;font-size:.85rem;font-weight:600;color:var(--ink)}
+.chart-head .theta-tag{font-family:var(--mono);font-size:.7rem;color:var(--muted);background:var(--soft);border:1px solid var(--line);padding:2px 8px;border-radius:5px}
+.chart-box{position:relative;height:220px;width:100%}
+.chart-box.tall{height:250px}
+.chart-fallback{display:flex;align-items:center;justify-content:center;height:100%;font-size:.8rem;color:var(--muted);text-align:center;padding:20px}
+.explorer-bottom{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:0 22px 22px}
+.distribution-card,.diagnostics-card{border:1px solid var(--line);border-radius:12px;padding:18px;background:#fff;min-width:0}
+.dist-chart-box{position:relative;height:170px;margin:8px 0 14px}
+.score-block{margin-top:6px}
+.score-label{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-bottom:8px}
+.score-label strong{color:var(--ink);font-family:var(--mono)}
+.score-track{position:relative;height:9px;border-radius:999px;background:linear-gradient(90deg,#dbeafe,#93c5fd,#2563eb);overflow:visible}
+.score-marker{
+  position:absolute;top:50%;left:44%;transform:translate(-50%,-50%);width:17px;height:17px;
+  background:#fff;border:3px solid var(--accent);border-radius:50%;box-shadow:0 2px 6px rgba(15,23,42,.25);transition:left .18s ease;
+}
+.score-scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.64rem;color:var(--faint);margin-top:8px}
+.diag-status{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:10px;
+  background:var(--green-soft);border:1px solid #a7f3d0;margin-bottom:16px;transition:all .2s;
+}
+.diag-status.violated{background:var(--red-soft);border-color:#fecaca}
+.diag-status .status-text{font-size:.82rem;font-weight:600;color:#047857}
+.diag-status.violated .status-text{color:var(--red)}
+.status-pill{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#047857}
+.diag-status.violated .status-pill{color:var(--red)}
+.diag-list{margin:0;display:flex;flex-direction:column;gap:10px}
+.diag-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:.8rem}
+.diag-row dt{color:var(--muted)}
+.diag-row dd{margin:0;font-family:var(--mono);font-weight:600;color:var(--ink);text-align:right}
+.diag-row dd.ok{color:var(--green)}
+.diag-row dd.bad{color:var(--red)}
+.diag-formula{padding:12px;background:var(--soft);border:1px solid var(--line);border-radius:8px;text-align:center;margin-bottom:14px;font-size:.9rem;overflow-x:auto}
+.fix-btn{
+  width:100%;margin-top:14px;padding:9px;border-radius:8px;border:1px solid #fecaca;
+  background:var(--red-soft);color:var(--red);font-size:.8rem;font-weight:600;cursor:pointer;
+}
+.fix-btn:hover{background:#fee2e2}
+.explorer-foot{
+  padding:14px 22px;background:var(--soft);border-top:1px solid var(--line);
+  font-size:.8rem;color:var(--muted);display:flex;gap:10px;align-items:flex-start;
+}
+.explorer-foot .icon{flex-shrink:0}
+.explorer-foot strong{color:var(--ink)}
+
+/* ==================== Method Steps ==================== */
+.method-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:26px 0}
+.step-card{padding:20px;border:1px solid var(--line);border-radius:12px;background:#fff;transition:transform .2s,box-shadow .2s}
+.step-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.step-num{font-family:var(--mono);font-size:.72rem;color:var(--accent);font-weight:600;margin-bottom:8px}
+.step-card h4{margin:0 0 6px;font-size:.95rem;color:var(--ink);font-weight:600}
+.step-card p{margin:0;font-size:.83rem;color:var(--muted);line-height:1.65}
+
+/* ==================== Table ==================== */
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);margin:24px 0 14px}
+table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:640px;background:#fff}
+thead th{
+  background:var(--soft);color:var(--ink);font-weight:600;font-size:.8rem;
+  padding:15px 18px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+thead th:first-child{text-align:left}
+tbody td{padding:15px 18px;text-align:center;border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:.83rem;color:var(--body)}
+tbody td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:500;color:var(--ink)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--soft)}
+tbody tr.ours{background:var(--accent-soft)}
+tbody tr.ours:hover{background:#e0edff}
+tbody tr.ours td:first-child{font-weight:700;box-shadow:inset 3px 0 0 var(--accent)}
+tbody tr.ours td{color:#1e3a8a;font-weight:600}
+.delta{font-size:.68rem;font-weight:600;margin-left:4px;white-space:nowrap}
+.delta.up{color:var(--green)}
+.delta.down{color:var(--green)}
+.delta.bad{color:var(--red)}
+.table-caption{font-size:.83rem;color:var(--muted);text-align:center;margin:12px 0 0}
+.table-caption strong{color:var(--ink)}
+.table-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);margin-top:12px}
+.legend-item{display:flex;align-items:center;gap:7px}
+.legend-swatch{width:12px;height:12px;border-radius:3px;background:var(--accent-soft);border:1px solid #bfdbfe}
+
+/* ==================== BibTeX ==================== */
+.bibtex-wrap{position:relative;margin-top:20px}
+.bibtex{
+  margin:0;background:#0f172a;color:#e2e8f0;padding:26px 24px;border-radius:12px;
+  overflow-x:auto;font-family:var(--mono);font-size:.8rem;line-height:1.85;box-shadow:var(--shadow);
+}
+.bibtex .key{color:#7dd3fc}
+.bibtex .field{color:#fca5a5}
+.copy-btn{
+  position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);
+  color:#e2e8f0;padding:6px 13px;border-radius:7px;font-size:.73rem;cursor:pointer;transition:background .2s;
+}
+.copy-btn:hover{background:rgba(255,255,255,.18)}
+.copy-btn.copied{background:#059669;border-color:#059669;color:#fff}
+
+/* ==================== Footer ==================== */
+footer{margin-top:64px;border-top:1px solid var(--line);padding:32px 0 40px;text-align:center;color:var(--muted);font-size:.82rem;background:var(--soft)}
+footer p{margin:6px 0}
+.back-top{
+  position:fixed;right:22px;bottom:22px;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);
+  background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:var(--shadow);opacity:0;pointer-events:none;transform:translateY(10px);transition:all .25s;z-index:90;
+}
+.back-top.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+.back-top:hover{color:var(--accent);border-color:#bfdbfe}
+
+/* ==================== Responsive ==================== */
+@media(max-width:960px){
+  .explorer-grid{grid-template-columns:1fr}
+  .control-panel{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+  .control-panel .panel-title,.control-panel .k-row,.control-panel .reset-btn{grid-column:1/-1}
+  .explorer-bottom{grid-template-columns:1fr}
+  .method-steps{grid-template-columns:1fr}
+  .formula-panel{grid-template-columns:1fr;gap:16px}
+  .formula-tile+.formula-tile{border-top:1px dashed var(--line);padding-top:14px}
+}
+@media(max-width:640px){
+  .wrap,.nav-inner{padding:0 18px}
+  .nav-badge{display:none}
+  .nav-links a{font-size:.78rem;padding:6px 8px}
+  .hero{padding:44px 0 30px}
+  .highlights{grid-template-columns:1fr}
+  .highlight+.highlight{border-left:none;border-top:1px solid var(--line-soft)}
+  .highlight{padding:16px}
+  .highlight .num{font-size:1.5rem}
+  section{padding:40px 0 4px}
+  h2.section-title{font-size:1.4rem}
+  .control-panel{grid-template-columns:1fr}
+  .explorer-grid,.explorer-bottom{padding:16px;gap:16px}
+  .explorer-bottom{padding:0 16px 16px}
+  .chart-box{height:200px}
+  .chart-box.tall{height:220px}
+  .pdf-native{height:420px}
+  .pdf-viewport{padding:10px}
+  figure figcaption{padding:14px 16px 18px;text-align:left}
+  .badges{gap:8px}
+  .badge{padding:9px 14px;font-size:.8rem}
+  .lead{text-align:left}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important;scroll-behavior:auto !important}
+}
+@media print{
+  .nav,.progress-bar,.back-top,.figure-tools,.badges,.explorer-shell,.copy-btn{display:none !important}
+  body{font-size:11pt;color:#000}
+  .paper-figure{box-shadow:none;break-inside:avoid}
+  section{padding:16px 0}
+}
+</style>
+</head>
+
+<body>
+
+<div class="progress-bar" id="progressBar" aria-hidden="true"></div>
+
+<!-- ==================== Navigation ==================== -->
+<nav class="nav" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a class="brand" href="#top" aria-label="AGQG home">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="#2563eb"/>
+        <path d="M6 24C12 24 12 8 18 8s6 16 8 16" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="18" cy="16" r="2.4" fill="#fff"/>
+      </svg>
+      AGQG
+    </a>
+    <div class="nav-links">
+      <a href="#abstract">Abstract</a>
+      <a href="#motivation">Motivation</a>
+      <a href="#explorer">Explorer</a>
+      <a href="#method">Method</a>
+      <a href="#results">Results</a>
+      <a href="#citation">BibTeX</a>
+    </div>
+    <span class="nav-badge">arXiv:2511.09948</span>
+  </div>
+</nav>
+
+<!-- ==================== Hero ==================== -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="conference-badge"><span class="dot"></span> arXiv Preprint · 2025</div>
+
+    <h1 class="paper-title">Plug In, Grade Right:<br>Psychology-Inspired AGIQA</h1>
+
+    <div class="authors">
+      <a href="#">Zhicheng Liao</a><sup>1</sup>&nbsp;&nbsp;
+      <a href="#">Baoliang Chen</a><sup>1,2</sup>&nbsp;&nbsp;
+      <a href="#">Hanwei Zhu</a><sup>2</sup>&nbsp;&nbsp;
+      <a href="#">Lingyu Zhu</a><sup>3</sup>&nbsp;&nbsp;
+      <a href="#">Shiqi Wang</a><sup>3</sup>&nbsp;&nbsp;
+      <a href="#">Weisi Lin</a><sup>2</sup>
+    </div>
+
+    <div class="affiliations">
+      <sup>1</sup>South China Normal University &nbsp;·&nbsp; 
+      <sup>2</sup>Nanyang Technological University &nbsp;·&nbsp; 
+      <sup>3</sup>City University of Hong Kong
+    </div>
+
+    <div class="venue-line">A psychometrics-inspired, plugable trainable module for AI-Generated Image Quality Assessment</div>
+
+    <div class="badges">
+      <a class="badge primary" href="https://arxiv.org/pdf/2511.09948" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg>
+        Paper
+      </a>
+      <a class="badge dark" href="https://github.com/zhix000/AGQG" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.77 1.06.77 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+        Code
+      </a>
+      <a class="badge green" href="#explorer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3v18h18M7 14c2 0 2-8 5-8s3 8 6 8"/></svg>
+        Interactive Demo
+      </a>
+      <a class="badge" href="#citation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        BibTeX
+      </a>
+    </div>
+
+    <!-- <div class="highlights">
+      <div class="highlight">
+        <div class="num">+23.5%</div>
+        <div class="lbl">Cross-dataset SRCC<br>(CLIP-AGIQA)</div>
+      </div>
+      <div class="highlight">
+        <div class="num green">−21.3%</div>
+        <div class="lbl">Computational Cost<br>(FLOPs, IPCE)</div>
+      </div>
+      <div class="highlight">
+        <div class="num ink">Unimodal</div>
+        <div class="lbl">Interpretable quality<br>distribution by design</div>
+      </div>
+    </div> -->
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ==================== Abstract ==================== -->
+  <section id="abstract">
+    <div class="prose">
+      <div class="section-head">
+        <div class="kicker"><span class="index">01</span> Overview</div>
+        <h2 class="section-title">Abstract</h2>
+      </div>
+      <div style="max-width: 900px; margin: 0 auto; padding: 10px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.7; color: #24292f; text-align: justify;">
+        <p style="margin-bottom: 1.2em;">
+            AI-generated image quality assessment (AGIQA) has garnered significant attention in recent years due to its critical role in quality control of AGIs. Existing AGIQA models typically estimate image quality by measuring and aggregating the similarities between image embeddings and text embeddings derived from multi-grade quality descriptions (<i>e.g.</i>, “a photo with excellent/good/poor quality”). Although effective, we observe that such similarity distributions across grades usually exhibit multimodal patterns. For instance, an image embedding may show high similarity to both “excellent” and “poor” grade descriptions while deviating from the “good” one. We refer to this phenomenon as <strong><i>“semantic drift”</i></strong>, where semantic inconsistencies between text embeddings and their intended descriptions undermine the reliability of text–image shared-space learning.
+        </p>
+        
+        <p style="margin-bottom: 1.2em;">
+            To mitigate this issue, we draw inspiration from psychometrics and propose an improved Graded Response Model (GRM) for AGIQA. The GRM is a classical assessment model that categorizes a subject's ability across grades using test items with various difficulty levels. This paradigm aligns remarkably well with human quality rating, where image quality can be interpreted as an image’s ability to meet various quality grades. Building on this philosophy, we design a two-branch quality grading module: one branch estimates image ability while the other constructs multiple difficulty levels. To ensure monotonicity in difficulty levels, we further model difficulty generation in an arithmetic manner, which inherently enforces a unimodal and interpretable quality distribution.
+        </p>
+        
+        <p style="margin-bottom: 0;">
+            Our <strong>A</strong>rithmetic <strong>G</strong>RM based <strong>Q</strong>uality <strong>G</strong>rading (<strong>AGQG</strong>) module enjoys a 
+            <span style="text-decoration: underline; color: #0969da; font-weight: 600;">pluggable design</span>, 
+            consistently improving performance when integrated into various state-of-the-art AGIQA frameworks. Moreover, it also generalizes effectively to both natural and screen content image quality assessment, revealing its potential as a key component in future IQA models.
+        </p>
+    </div>
+      <div class="keywords">
+        <span class="chip">AGIQA</span>
+        <span class="chip">Psychometrics</span>
+        <span class="chip">Graded Response Model</span>
+        <span class="chip">Semantic Drift</span>
+        <span class="chip">plugable</span>
+      </div>
+      <div class="callout">
+        <span class="icon">💡</span>
+        <div><strong>One idea, many backbones.</strong> Replace multi-grade prompt matching with a principled psychometric grading process —
+          gain accuracy, interpretability, and efficiency without redesigning the underlying AGIQA model.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Motivation ==================== -->
+  <section id="motivation">
+    <div class="section-head">
+      <div class="kicker"><span class="index">02</span> Motivation</div>
+      <h2 class="section-title">Semantic Drift vs. AGQG</h2>
+      <!-- <p class="section-sub">Why multi-modal quality predictions are a fundamental flaw — and how a graded response model fixes it.</p> -->
+    </div>
+
+    <!-- PDF 图 1：原生 iframe 作为无 JS / 渲染失败时的兜底 -->
+    <figure class="paper-figure" data-pdf="figures/fig1.pdf">
+      <div class="figure-toolbar">
+        <span class="figure-label">Figure 1 <span class="pdf-tag">PDF · VECTOR</span></span>
+        <div class="figure-tools">
+          <button class="tool-btn pdf-ctrl" data-action="prev" title="Previous page" hidden>‹</button>
+          <span class="page-indicator pdf-ctrl" hidden>1 / 1</span>
+          <button class="tool-btn pdf-ctrl" data-action="next" title="Next page" hidden>›</button>
+          <span class="tool-sep pdf-ctrl" hidden></span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-out" title="Zoom out" hidden>−</button>
+          <span class="page-indicator pdf-ctrl zoom-label" hidden>100%</span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-in" title="Zoom in" hidden>+</button>
+          <button class="tool-btn pdf-ctrl" data-action="fit" title="Fit to width" hidden>Fit</button>
+          <a class="open-pdf" href="figures/fig1.pdf" target="_blank" rel="noopener">Open PDF ↗</a>
+        </div>
+      </div>
+      <div class="pdf-body">
+        <iframe class="pdf-native" src="figures/fig1.pdf#toolbar=0&navpanes=0&view=FitH" title="Figure 1: Semantic drift versus AGQG" loading="lazy"></iframe>
+        <div class="pdf-viewport" hidden>
+          <div class="pdf-stage">
+            <canvas aria-label="Rendered Figure 1"></canvas>
+            <div class="pdf-overlay"><div class="spinner"></div><span>Rendering PDF…</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <strong>Figure 1:</strong> Illustration of the “semantic drift” phenomenon in existing AGIQA models.
+        (Left) Existing models often produce multi-peak prediction distributions due to semantic misalignment.
+        (Right) Our AGQG module consistently improves existing AGIQA models across diverse datasets and dimensions
+        (Q: Quality, C: Consistency, A: Authenticity), while ensuring unimodal distributions and reducing prediction errors (MSE).
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ==================== Interactive Explorer ==================== -->
+  <section id="explorer">
+    <div class="section-head">
+      <div class="kicker"><span class="index">03</span> Interactive Analysis</div>
+      <h2 class="section-title">Interactive AGRM Explorer</h2>
+      <p class="section-sub">Explore how the Arithmetic Graded Response Model shapes probability distributions — live, in your browser.</p>
+    </div>
+
+    <p class="explorer-intro">
+      Adjust the ability \(\theta\) and the item parameters to observe the <strong>guaranteed unimodal property</strong>.
+      The panels below render the cumulative category probabilities, the category response curves,
+      and the resulting discrete quality distribution at the current ability level.
+    </p>
+
+    <!-- 公式面板 -->
+    <div class="formula-panel">
+      <div class="formula-tile">
+        <div class="f-label">Cumulative Probability</div>
+        <div class="f-math">\[P^*_k(\theta)=\frac{1}{1+e^{-D\alpha(\theta-\beta_k)}}\]</div>
+      </div>
+      <div class="formula-tile">
+        <div class="f-label">Arithmetic Difficulty</div>
+        <div class="f-math">\[\beta_k=\beta_1+(k-1)\gamma\]</div>
+      </div>
+      <div class="formula-tile">
+        <div class="f-label">Category Response</div>
+        <div class="f-math">\[P_k(\theta)=P^*_{k-1}(\theta)-P^*_k(\theta)\]</div>
+      </div>
+    </div>
+
+    <div class="explorer-shell">
+      <!-- 顶栏 + 预设 -->
+      <div class="explorer-topbar">
+        <div class="title"><span class="live-dot"></span> AGRM Live Simulator <span style="opacity:.5;font-weight:400">/ K = <span id="k-readout">5</span> categories</span></div>
+        <div class="preset-group" role="group" aria-label="Parameter presets">
+          <button class="preset-btn active" data-preset="unimodal">Unimodal</button>
+          <button class="preset-btn" data-preset="drift">Multi-peak Drift</button>
+          <button class="preset-btn" data-preset="sharp">High Discrimination</button>
+          <button class="preset-btn" data-preset="fine">Fine-grained</button>
+        </div>
+      </div>
+
+      <div class="explorer-grid">
+        <!-- 左侧参数面板 -->
+        <aside class="control-panel" aria-label="AGRM parameters">
+          <h3 class="panel-title">Model Parameters</h3>
+
+          <div class="k-row">
+            <label for="k-select">Categories \(K\)</label>
+            <select id="k-select" aria-label="Number of quality categories">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="7">7</option>
+              <option value="9">9</option>
+            </select>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-head">
+              <label for="theta">Subject Ability \(\theta\)</label>
+              <output id="theta-val" for="theta">2.50</output>
+            </div>
+            <input type="range" id="theta" min="-3" max="3" step="0.05" value="2.5" aria-label="Subject ability theta">
+            <div class="slider-bounds"><span>−3.0</span><span>+3.0</span></div>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-head">
+              <label for="alpha">Discrimination \(\alpha\)</label>
+              <output id="alpha-val" for="alpha">1.00</output>
+            </div>
+            <input type="range" id="alpha" min="0.1" max="3" step="0.05" value="1" aria-label="Discrimination alpha">
+            <div class="slider-bounds"><span>0.1</span><span>3.0</span></div>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-head">
+              <label for="D">Scaling Constant \(D\)</label>
+              <output id="D-val" for="D">1.70</output>
+            </div>
+            <input type="range" id="D" min="1" max="2" step="0.05" value="1.7" aria-label="Scaling constant D">
+            <div class="slider-bounds"><span>1.0</span><span>2.0</span></div>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-head">
+              <label for="beta1">Base Difficulty \(\beta_1\)</label>
+              <output id="beta1-val" for="beta1">0.00</output>
+            </div>
+            <input type="range" id="beta1" min="-3" max="3" step="0.1" value="0" aria-label="Base difficulty beta 1">
+            <div class="slider-bounds"><span>−3.0</span><span>+3.0</span></div>
+          </div>
+
+          <div class="slider-row">
+            <div class="slider-head">
+              <label for="gamma">Difficulty Interval \(\gamma\)</label>
+              <output id="gamma-val" for="gamma">2.00</output>
+            </div>
+            <input type="range" id="gamma" min="0.1" max="5" step="0.05" value="2" aria-label="Difficulty interval gamma">
+            <div class="slider-bounds"><span>0.1</span><span>5.0</span></div>
+          </div>
+
+          <button class="reset-btn" id="reset-btn">↺ Reset to Default</button>
+        </aside>
+
+        <!-- 右侧曲线 -->
+        <div class="chart-stack">
+          <div class="chart-card">
+            <div class="chart-head">
+              <h4>Cumulative Category Probability \(P^*_k(\theta)\)</h4>
+              <span class="theta-tag" id="theta-tag-cum">θ = 2.50</span>
+            </div>
+            <div class="chart-box">
+              <canvas id="cumulative-chart" role="img" aria-label="Cumulative category probability curves"></canvas>
+              <div class="chart-fallback" id="cum-fallback" hidden>Chart library unavailable. Please check your network connection.</div>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-head">
+              <h4>Category Response Probability \(P_k(\theta)\)</h4>
+              <span class="theta-tag" id="theta-tag-resp">θ = 2.50</span>
+            </div>
+            <div class="chart-box tall">
+              <canvas id="response-chart" role="img" aria-label="Category response probability curves"></canvas>
+              <div class="chart-fallback" id="resp-fallback" hidden>Chart library unavailable. Please check your network connection.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部：分布 + 诊断 -->
+      <div class="explorer-bottom">
+        <div class="distribution-card">
+          <div class="chart-head">
+            <h4>Quality Distribution at Current \(\theta\)</h4>
+            <span class="theta-tag" id="theta-tag-bar">θ = 2.50</span>
+          </div>
+          <div class="dist-chart-box">
+            <canvas id="distribution-chart" role="img" aria-label="Discrete category probability at the current ability"></canvas>
+            <div class="chart-fallback" id="bar-fallback" hidden>Chart library unavailable.</div>
+          </div>
+
+          <div class="score-block">
+            <div class="score-label">
+              <span>Predicted Quality (normalized 0–1)</span>
+              <strong id="score-text">0.440</strong>
+            </div>
+            <div class="score-track" role="meter" aria-label="Normalized predicted quality" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0.44" id="score-meter">
+              <div class="score-marker" id="score-marker"></div>
+            </div>
+            <div class="score-scale"><span>Low</span><span>Medium</span><span>High</span></div>
+          </div>
+        </div>
+
+        <div class="diagnostics-card">
+          <div class="diag-formula">\(\gamma > \dfrac{2\ln 2}{D\alpha}\)</div>
+
+          <div class="diag-status" id="diag-status">
+            <span class="status-text" id="constraint-line">2.00 &gt; 0.816</span>
+            <span class="status-pill" id="constraint-badge">✓ Unimodal</span>
+          </div>
+
+          <dl class="diag-list">
+            <div class="diag-row"><dt>Minimum interval \(\gamma_{\min}\)</dt><dd id="gamma-min">0.816</dd></div>
+            <div class="diag-row"><dt>Modal category at \(\theta\)</dt><dd id="modal-category">C₃</dd></div>
+            <div class="diag-row"><dt>Peak probability \(P_{k^*}\)</dt><dd id="peak-prob">0.625</dd></div>
+            <div class="diag-row"><dt>Expected category \(\mathbb{E}[k]\)</dt><dd id="expected-grade">2.762</dd></div>
+            <div class="diag-row"><dt>Normalized entropy</dt><dd id="entropy-value">0.661</dd></div>
+            <div class="diag-row"><dt>Multi-modal categories</dt><dd id="peak-list" class="ok">None</dd></div>
+          </dl>
+
+          <button class="fix-btn" id="fix-btn" hidden>⚡ Restore Unimodality</button>
+        </div>
+      </div>
+
+      <div class="explorer-foot">
+        <span class="icon">📐</span>
+        <div>
+          <strong>Why unimodality matters.</strong>
+          When \(\gamma > \frac{2\ln 2}{D\alpha}\), every category response \(P_k(\theta)\) is guaranteed to be unimodal.
+          Violating this bound produces multi-peak responses — the mathematical counterpart of the
+          <strong>semantic drift</strong> observed in prompt-based AGIQA. Try the <em>Multi-peak Drift</em> preset to see it.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Method ==================== -->
+  <section id="method">
+    <div class="section-head">
+      <div class="kicker"><span class="index">04</span> Methodology</div>
+      <h2 class="section-title">The AGQG Framework</h2>
+      <p class="section-sub">Decouple ability from difficulty, then grade with a principled psychometric model.</p>
+    </div>
+
+    <div class="method-steps">
+      <div class="step-card">
+        <div class="step-num">STEP 01</div>
+        <h4>Ability Estimation</h4>
+        <p>An existing AGIQA backbone estimates the latent quality ability \(\theta\) of the input image, without multi-grade prompt encoding.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">STEP 02</div>
+        <h4>Difficulty Estimation</h4>
+        <p An additional lightweight branch predicts quality difficulty parameters, yielding arithmetic thresholds \(\beta_k=\beta_1+(k-1)\gamma\).</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">STEP 03</div>
+        <h4>AGRM Quality Grading</h4>
+        <p>The AGRM converts ability and difficulty into unimodal category probabilities. A weighted summation produces the final interpretable quality score.</p>
+      </div>
+    </div>
+
+    <figure class="paper-figure" data-pdf="figures/img_frame2.pdf">
+      <div class="figure-toolbar">
+        <span class="figure-label">Figure 2 <span class="pdf-tag">PDF · VECTOR</span></span>
+        <div class="figure-tools">
+          <button class="tool-btn pdf-ctrl" data-action="prev" title="Previous page" hidden>‹</button>
+          <span class="page-indicator pdf-ctrl" hidden>1 / 1</span>
+          <button class="tool-btn pdf-ctrl" data-action="next" title="Next page" hidden>›</button>
+          <span class="tool-sep pdf-ctrl" hidden></span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-out" title="Zoom out" hidden>−</button>
+          <span class="page-indicator pdf-ctrl zoom-label" hidden>100%</span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-in" title="Zoom in" hidden>+</button>
+          <button class="tool-btn pdf-ctrl" data-action="fit" title="Fit to width" hidden>Fit</button>
+          <a class="open-pdf" href="figures/img_frame2.pdf" target="_blank" rel="noopener">Open PDF ↗</a>
+        </div>
+      </div>
+      <div class="pdf-body">
+        <iframe class="pdf-native" src="figures/img_frame2.pdf#toolbar=0&navpanes=0&view=FitH" title="Figure 2: AGQG framework" loading="lazy"></iframe>
+        <div class="pdf-viewport" hidden>
+          <div class="pdf-stage">
+            <canvas aria-label="Rendered Figure 2"></canvas>
+            <div class="pdf-overlay"><div class="spinner"></div><span>Rendering PDF…</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <strong>Figure 2:</strong> Illustration of our AGQG enhancement framework. We adopt the existing AGIQA model for ability estimation
+        and augment it with an additional branch for difficulty estimation. Quality categorization is then performed by the proposed AGRM model
+        using the estimated image ability and quality difficulty. The final quality score is computed as a weighted summation of the categorization results.
+      </figcaption>
+    </figure>
+
+    <figure class="paper-figure" data-pdf="figures/img_agrm_prob.pdf">
+      <div class="figure-toolbar">
+        <span class="figure-label">Figure 3 <span class="pdf-tag">PDF · VECTOR</span></span>
+        <div class="figure-tools">
+          <button class="tool-btn pdf-ctrl" data-action="prev" title="Previous page" hidden>‹</button>
+          <span class="page-indicator pdf-ctrl" hidden>1 / 1</span>
+          <button class="tool-btn pdf-ctrl" data-action="next" title="Next page" hidden>›</button>
+          <span class="tool-sep pdf-ctrl" hidden></span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-out" title="Zoom out" hidden>−</button>
+          <span class="page-indicator pdf-ctrl zoom-label" hidden>100%</span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-in" title="Zoom in" hidden>+</button>
+          <button class="tool-btn pdf-ctrl" data-action="fit" title="Fit to width" hidden>Fit</button>
+          <a class="open-pdf" href="figures/img_agrm_prob.pdf" target="_blank" rel="noopener">Open PDF ↗</a>
+        </div>
+      </div>
+      <div class="pdf-body">
+        <iframe class="pdf-native" src="figures/img_agrm_prob.pdf#toolbar=0&navpanes=0&view=FitH" title="Figure 3: Category probability distributions" loading="lazy"></iframe>
+        <div class="pdf-viewport" hidden>
+          <div class="pdf-stage">
+            <canvas aria-label="Rendered Figure 3"></canvas>
+            <div class="pdf-overlay"><div class="spinner"></div><span>Rendering PDF…</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <strong>Figure 3:</strong> Distributions of the cumulative category probability \(P^*(\theta)\), category response probability \(P(\theta)\),
+        and the category response probability at specific \(\theta\). With increasing \(\gamma\), the response distributions exhibit enhanced unimodality,
+        aligning more closely with the expected behavior in human quality assessment.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- ==================== Qualitative ==================== -->
+  <section id="qualitative">
+    <div class="section-head">
+      <div class="kicker"><span class="index">05</span> Qualitative Results</div>
+      <h2 class="section-title">Interpretability &amp; Attention Analysis</h2>
+      <p class="section-sub">From unstable multi-peak predictions to coherent, human-aligned quality perception.</p>
+    </div>
+
+    <figure class="paper-figure" data-pdf="figures/img_atten_box.pdf">
+      <div class="figure-toolbar">
+        <span class="figure-label">Figure 5 <span class="pdf-tag">PDF · VECTOR</span></span>
+        <div class="figure-tools">
+          <button class="tool-btn pdf-ctrl" data-action="prev" title="Previous page" hidden>‹</button>
+          <span class="page-indicator pdf-ctrl" hidden>1 / 1</span>
+          <button class="tool-btn pdf-ctrl" data-action="next" title="Next page" hidden>›</button>
+          <span class="tool-sep pdf-ctrl" hidden></span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-out" title="Zoom out" hidden>−</button>
+          <span class="page-indicator pdf-ctrl zoom-label" hidden>100%</span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-in" title="Zoom in" hidden>+</button>
+          <button class="tool-btn pdf-ctrl" data-action="fit" title="Fit to width" hidden>Fit</button>
+          <a class="open-pdf" href="figures/img_atten_box.pdf" target="_blank" rel="noopener">Open PDF ↗</a>
+        </div>
+      </div>
+      <div class="pdf-body">
+        <iframe class="pdf-native" src="figures/img_atten_box.pdf#toolbar=0&navpanes=0&view=FitH" title="Figure 4: Attention map visualization" loading="lazy"></iframe>
+        <div class="pdf-viewport" hidden>
+          <div class="pdf-stage">
+            <canvas aria-label="Rendered Figure 5"></canvas>
+            <div class="pdf-overlay"><div class="spinner"></div><span>Rendering PDF…</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <strong>Figure 5:</strong> Visualization of attention maps for the perceptual quality and semantic consistency assessment tasks.
+        Distorted and prompt-relevant regions are annotated with bounding boxes. AGQG significantly improves attention coverage,
+        localization accuracy, and alignment with human attention (lower ADD, higher AC and AIoU).
+      </figcaption>
+    </figure>
+
+    <figure class="paper-figure" data-pdf="figures/img_prob_vis.pdf">
+      <div class="figure-toolbar">
+        <span class="figure-label">Figure 4 <span class="pdf-tag">PDF · VECTOR</span></span>
+        <div class="figure-tools">
+          <button class="tool-btn pdf-ctrl" data-action="prev" title="Previous page" hidden>‹</button>
+          <span class="page-indicator pdf-ctrl" hidden>1 / 1</span>
+          <button class="tool-btn pdf-ctrl" data-action="next" title="Next page" hidden>›</button>
+          <span class="tool-sep pdf-ctrl" hidden></span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-out" title="Zoom out" hidden>−</button>
+          <span class="page-indicator pdf-ctrl zoom-label" hidden>100%</span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-in" title="Zoom in" hidden>+</button>
+          <button class="tool-btn pdf-ctrl" data-action="fit" title="Fit to width" hidden>Fit</button>
+          <a class="open-pdf" href="figures/img_prob_vis.pdf" target="_blank" rel="noopener">Open PDF ↗</a>
+        </div>
+      </div>
+      <div class="pdf-body">
+        <iframe class="pdf-native" src="figures/img_prob_vis.pdf#toolbar=0&navpanes=0&view=FitH" title="Figure 5: Quality categorization distributions" loading="lazy"></iframe>
+        <div class="pdf-viewport" hidden>
+          <div class="pdf-stage">
+            <canvas aria-label="Rendered Figure 4"></canvas>
+            <div class="pdf-overlay"><div class="spinner"></div><span>Rendering PDF…</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <strong>Figure 4:</strong> Visualization of the probability distributions of quality categorization from the original AGIQA models
+        against models enhanced by our AGQG module. AGQG effectively eliminates the “multi-peak” semantic drift phenomenon,
+        producing consistently unimodal and interpretable distributions.
+      </figcaption>
+    </figure>
+
+
+    <figure class="paper-figure" data-pdf="figures/img_scatter.pdf">
+      <div class="figure-toolbar">
+        <span class="figure-label">Figure 4 <span class="pdf-tag">PDF · VECTOR</span></span>
+        <div class="figure-tools">
+          <button class="tool-btn pdf-ctrl" data-action="prev" title="Previous page" hidden>‹</button>
+          <span class="page-indicator pdf-ctrl" hidden>1 / 1</span>
+          <button class="tool-btn pdf-ctrl" data-action="next" title="Next page" hidden>›</button>
+          <span class="tool-sep pdf-ctrl" hidden></span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-out" title="Zoom out" hidden>−</button>
+          <span class="page-indicator pdf-ctrl zoom-label" hidden>100%</span>
+          <button class="tool-btn pdf-ctrl" data-action="zoom-in" title="Zoom in" hidden>+</button>
+          <button class="tool-btn pdf-ctrl" data-action="fit" title="Fit to width" hidden>Fit</button>
+          <a class="open-pdf" href="figures/img_scatter.pdf" target="_blank" rel="noopener">Open PDF ↗</a>
+        </div>
+      </div>
+      <div class="pdf-body">
+        <iframe class="pdf-native" src="figures/img_scatter.pdf#toolbar=0&navpanes=0&view=FitH" title="Figure 6: Quality categorization Satter" loading="lazy"></iframe>
+        <div class="pdf-viewport" hidden>
+          <div class="pdf-stage">
+            <canvas aria-label="Rendered Figure 4"></canvas>
+            <div class="pdf-overlay"><div class="spinner"></div><span>Rendering PDF…</span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>
+        <strong>Figure 6:</strong> Predicted scores versus ground-truth MOS. Blue: original models; green: models with AGQG; dashed line: ideal prediction. Q/C/A denote quality, consistency, and authenticity.
+      </figcaption>
+    </figure>
+
+  </section>
+
+  <!-- ==================== Quantitative ==================== -->
+  <section id="results">
+    <div class="section-head">
+      <div class="kicker"><span class="index">06</span> Quantitative Results</div>
+      <h2 class="section-title">Better Accuracy, Lower Cost</h2>
+      <p class="section-sub">AGQG consistently enhances various AGIQA backbones while reducing computational overhead by eliminating multi-grade prompt encoding.</p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Method</th>
+            <th scope="col">Intra SRCC ↑</th>
+            <th scope="col">Cross SRCC ↑</th>
+            <th scope="col">FLOPs (G) ↓</th>
+            <th scope="col">Params (M) ↓</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>IPCE <span style="color:var(--faint);font-size:.75rem">(Baseline)</span></td>
+            <td>0.8298</td><td>0.6948</td><td>36.21</td><td>84.23</td>
+          </tr>
+          <tr class="ours">
+            <td>AGQG + IPCE</td>
+            <td>0.8345 <span class="delta up">+0.57%</span></td>
+            <td>0.7085 <span class="delta up">+1.97%</span></td>
+            <td>28.50 <span class="delta down">−21.3%</span></td>
+            <td>84.39 <span class="delta bad">+0.19%</span></td>
+          </tr>
+          <tr>
+            <td>CLIP-AGIQA <span style="color:var(--faint);font-size:.75rem">(Baseline)</span></td>
+            <td>0.8154</td><td>0.6110</td><td>58.30</td><td>170.29</td>
+          </tr>
+          <tr class="ours">
+            <td>AGQG + CLIP-AGIQA</td>
+            <td>0.8535 <span class="delta up">+4.67%</span></td>
+            <td>0.7550 <span class="delta up">+23.5%</span></td>
+            <td>52.83 <span class="delta down">−9.38%</span></td>
+            <td>165.60 <span class="delta down">−2.75%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-legend">
+      <span class="legend-item"><span class="legend-swatch"></span> Ours (AGQG-enhanced)</span>
+      <span class="legend-item">↑ Higher is better</span>
+      <span class="legend-item">↓ Lower is better</span>
+    </div>
+
+    <p class="table-caption">
+      <strong>Table 1:</strong> Performance and Resource Efficiency Analysis.
+      AGQG achieves the best of both worlds: higher accuracy and lower computational cost.
+    </p>
+  </section>
+
+  <!-- ==================== Citation ==================== -->
+  <section id="citation">
+    <div class="prose">
+      <div class="section-head">
+        <div class="kicker"><span class="index">07</span> Citation</div>
+        <h2 class="section-title">BibTeX</h2>
+        <p class="section-sub">If you find this work useful, please consider citing our paper.</p>
+      </div>
+
+      <div class="bibtex-wrap">
+        <button class="copy-btn" id="copy-bibtex" aria-label="Copy BibTeX to clipboard">Copy</button>
+        <pre class="bibtex"><code id="bibtex-code">@article{liao2025plug,
+  title={Plug In, Grade Right: Psychology-Inspired AGIQA},
+  author={Liao, Zhicheng and Chen, Baoliang and Zhu, Hanwei and Zhu, Lingyu and Wang, Shiqi and Lin, Weisi},
+  journal={arXiv preprint arXiv:2512.22780},
+  year={2025}
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><strong>Plug In, Grade Right: Psychology-Inspired AGIQA</strong></p>
+    <p>Website template inspired by <a href="https://nerfies.github.io/" target="_blank" rel="noopener">Nerfies</a> and top-tier CV/ML conference styles.</p>
+    <p>© 2025 AGQG Authors. All rights reserved.</p>
+  </div>
+</footer>
+
+<button class="back-top" id="backTop" aria-label="Back to top">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+
+<noscript>
+  <div style="padding:16px;text-align:center;background:#fef2f2;color:#991b1b;font-size:.85rem">
+    JavaScript is required for the interactive AGRM explorer and high-resolution PDF rendering. Figures fall back to native browser PDF previews.
+  </div>
+</noscript>
+
+<script>
+/* ==========================================================================
+   1. 全局工具
+   ========================================================================== */
+document.addEventListener('DOMContentLoaded', function () {
+  initNavigation();
+  initBibtex();
+  initExplorer();
+  initPDFFigures();
+});
+
+/* ---------- 导航高亮 / 阅读进度 / 返回顶部 ---------- */
+function initNavigation() {
+  const progress = document.getElementById('progressBar');
+  const backTop = document.getElementById('backTop');
+  const links = Array.from(document.querySelectorAll('.nav-links a'));
+  const sections = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+
+  let ticking = false;
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      progress.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+      backTop.classList.toggle('show', window.scrollY > 600);
+      ticking = false;
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  backTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+  if ('IntersectionObserver' in window) {
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          links.forEach(a => {
+            const active = a.getAttribute('href') === '#' + entry.target.id;
+            a.classList.toggle('active', active);
+            if (active) a.setAttribute('aria-current', 'true');
+            else a.removeAttribute('aria-current');
+          });
+        }
+      });
+    }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+    sections.forEach(s => obs.observe(s));
+  }
+}
+
+/* ---------- BibTeX 复制（兼容 file:// 与非安全上下文） ---------- */
+function initBibtex() {
+  const btn = document.getElementById('copy-bibtex');
+  const code = document.getElementById('bibtex-code');
+  btn.addEventListener('click', async () => {
+    const text = code.innerText;
+    let ok = false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch (_) {}
+    if (!ok) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+    }
+    btn.textContent = ok ? 'Copied!' : 'Select & Copy';
+    btn.classList.toggle('copied', ok);
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+/* ==========================================================================
+   2. Interactive AGRM Explorer
+   --------------------------------------------------------------------------
+   模型定义：
+     P*_k(θ) = sigmoid( D · α · (θ − β_k) ),  β_k = β1 + (k−1)·γ,  k = 1..K−1
+     P*_0(θ) = 1,  P*_K(θ) = 0
+     P_k(θ)  = P*_{k−1}(θ) − P*_k(θ),        k = 1..K
+   单峰充分条件：γ > 2·ln(2) / (D·α)
+   期望类别：E[k] = Σ k·P_k(θ)，归一化分数 = (E[k] − 1) / (K − 1)
+   ========================================================================== */
+function initExplorer() {
+  const $ = id => document.getElementById(id);
+  const palette = ['#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#4f46e5', '#db2777', '#475569'];
+  const subscripts = ['₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'];
+  const sub = n => String(n).split('').map(d => subscripts[+d] || d).join('');
+
+  const defaults = { theta: 2.5, alpha: 1.0, D: 1.7, beta1: 0.0, gamma: 2.0, K: 5 };
+  const presets = {
+    unimodal: { ...defaults },
+    drift:    { theta: 2.5, alpha: 1.0, D: 1.7, beta1: 0.0, gamma: 0.35, K: 5 },
+    sharp:    { theta: 1.5, alpha: 2.5, D: 1.7, beta1: -1.0, gamma: 1.2, K: 5 },
+    fine:     { theta: 2.0, alpha: 1.5, D: 1.7, beta1: -2.0, gamma: 1.0, K: 9 }
+  };
+
+  const ids = ['theta', 'alpha', 'D', 'beta1', 'gamma'];
+  let params = { ...defaults };
+  let charts = { cumulative: null, response: null, distribution: null };
+  const hasChart = typeof window.Chart !== 'undefined';
+
+  /* ---------- 数学核心 ---------- */
+  const sigmoid = z => 1 / (1 + Math.exp(-z));
+
+  function cumulativeAt(theta, p, k) {
+    const beta = p.beta1 + (k - 1) * p.gamma;
+    return sigmoid(p.D * p.alpha * (theta - beta));
+  }
+
+  function categoryProbs(theta, p) {
+    const cum = [1];
+    for (let k = 1; k <= p.K - 1; k++) cum.push(cumulativeAt(theta, p, k));
+    cum.push(0);
+    const out = [];
+    for (let k = 1; k <= p.K; k++) out.push(Math.max(0, cum[k - 1] - cum[k]));
+    const sum = out.reduce((a, b) => a + b, 0) || 1;
+    return out.map(v => v / sum);
+  }
+
+  function gammaMin(p) { return 2 * Math.log(2) / (p.D * p.alpha); }
+
+  // 数值检测每条类别响应曲线的局部峰数量（用于诊断多峰漂移）
+  function countPeaks(p, k) {
+    const N = 601, lo = -6, hi = 6;
+    const ys = [];
+    for (let i = 0; i < N; i++) {
+      const theta = lo + (hi - lo) * i / (N - 1);
+      const prev = k === 1 ? 1 : cumulativeAt(theta, p, k - 1);
+      const next = k === p.K ? 0 : cumulativeAt(theta, p, k);
+      ys.push(Math.max(0, prev - next));
+    }
+    const peaks = [];
+    for (let i = 1; i < N - 1; i++) {
+      if (ys[i] > 1e-5 && ys[i] > ys[i - 1] + 1e-10 && ys[i] > ys[i + 1] + 1e-10) peaks.push(i);
+    }
+    // 合并因数值误差产生的极近双峰（谷底不够深）
+    const merged = [];
+    for (const idx of peaks) {
+      if (!merged.length) { merged.push(idx); continue; }
+      const last = merged[merged.length - 1];
+      let valley = Infinity;
+      for (let j = last; j <= idx; j++) valley = Math.min(valley, ys[j]);
+      if (Math.min(ys[last], ys[idx]) - valley < 2e-3) {
+        if (ys[idx] > ys[last]) merged[merged.length - 1] = idx;
+      } else merged.push(idx);
+    }
+    if (!merged.length && Math.max(...ys) > 1e-3) return 1; // 平台型单峰
+    return merged.length;
+  }
+
+  /* ---------- Chart.js 自定义插件：θ 参考线 + 曲线采样点 ---------- */
+  const thetaMarker = {
+    id: 'thetaMarker',
+    afterDatasetsDraw(chart, _args, opts) {
+      if (!opts || !opts.enabled || !chart.$params) return;
+      const p = chart.$params;
+      const { ctx, chartArea, scales } = chart;
+      if (!scales.x || !scales.y) return;
+      const px = scales.x.getPixelForValue(p.theta);
+      if (px < chartArea.left || px > chartArea.right) return;
+
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px, chartArea.top);
+      ctx.lineTo(px, chartArea.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const probs = categoryProbs(p.theta, p);
+      const n = chart.data.datasets.length;
+      for (let i = 0; i < n; i++) {
+        const meta = chart.getDatasetMeta(i);
+        if (meta.hidden) continue;
+        const color = chart.data.datasets[i].borderColor;
+        const val = opts.kind === 'cumulative'
+          ? cumulativeAt(p.theta, p, i + 1)
+          : probs[i];
+        const py = scales.y.getPixelForValue(val);
+        ctx.beginPath();
+        ctx.arc(px, py, opts.kind === 'cumulative' ? 3 : 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  };
+
+  /* ---------- 构建图表 ---------- */
+  function buildCharts() {
+    if (!hasChart) {
+      ['cum-fallback', 'resp-fallback', 'bar-fallback'].forEach(id => { $(id).hidden = false; });
+      ['cumulative-chart', 'response-chart', 'distribution-chart'].forEach(id => { $(id).hidden = true; });
+      return;
+    }
+
+    Chart.register(thetaMarker);
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.font.size = 10;
+    Chart.defaults.color = '#64748b';
+    Chart.defaults.animation = false;
+
+    const lineOptions = (kind) => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 6, right: 8 } },
+      scales: {
+        x: {
+          type: 'linear', min: -4, max: 4,
+          title: { display: true, text: 'Ability θ', font: { size: 10 }, color: '#94a3b8' },
+          grid: { color: 'rgba(226,232,240,.65)' },
+          border: { color: '#e2e8f0' },
+          ticks: { stepSize: 1, font: { size: 9 } }
+        },
+        y: {
+          min: 0, max: 1.05,
+          title: { display: true, text: 'Probability', font: { size: 10 }, color: '#94a3b8' },
+          grid: { color: 'rgba(226,232,240,.65)' },
+          border: { display: false },
+          ticks: { stepSize: 0.25, font: { size: 9 }, callback: v => Number(v).toFixed(2) }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 14, boxHeight: 2, padding: 12, font: { size: 9 } }
+        },
+        tooltip: {
+          backgroundColor: '#0f172a', padding: 10, cornerRadius: 8,
+          titleFont: { size: 11 }, bodyFont: { family: "'JetBrains Mono', monospace", size: 10 },
+          callbacks: {
+            title: items => 'θ = ' + Number(items[0].parsed.x).toFixed(2),
+            label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(4)
+          }
+        },
+        thetaMarker: { enabled: true, kind: kind }
+      }
+    });
+
+    charts.cumulative = new Chart($('cumulative-chart'), {
+      type: 'line', data: { datasets: [] }, options: lineOptions('cumulative')
+    });
+    charts.response = new Chart($('response-chart'), {
+      type: 'line', data: { datasets: [] }, options: lineOptions('response')
+    });
+
+    charts.distribution = new Chart($('distribution-chart'), {
+      type: 'bar',
+      data: { labels: [], datasets: [{ label: 'P_k(θ)', data: [], borderRadius: 4, maxBarThickness: 44, borderWidth: 1.5 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        scales: {
+          x: {
+            grid: { display: false }, border: { color: '#e2e8f0' },
+            title: { display: true, text: 'Quality Category', font: { size: 9 }, color: '#94a3b8' },
+            ticks: { font: { size: 10 } }
+          },
+          y: {
+            min: 0, max: 1,
+            grid: { color: 'rgba(226,232,240,.65)' }, border: { display: false },
+            ticks: { stepSize: 0.25, font: { size: 9 }, callback: v => Number(v).toFixed(2) }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a', padding: 10, cornerRadius: 8,
+            callbacks: {
+              title: items => 'Category ' + items[0].label,
+              label: ctx => ' P = ' + Number(ctx.parsed.y).toFixed(4)
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /* ---------- 更新曲线数据 ---------- */
+  function updateLineChart(chart, kind, p) {
+    if (!chart) return;
+    const datasets = [];
+    const N = 321, lo = -4, hi = 4;
+    const probs = categoryProbs(p.theta, p);
+    let modal = 0;
+    probs.forEach((v, i) => { if (v > probs[modal]) modal = i; });
+
+    const count = kind === 'cumulative' ? p.K - 1 : p.K;
+    for (let i = 0; i < count; i++) {
+      const data = [];
+      for (let j = 0; j < N; j++) {
+        const x = lo + (hi - lo) * j / (N - 1);
+        let y;
+        if (kind === 'cumulative') y = cumulativeAt(x, p, i + 1);
+        else {
+          const prev = i === 0 ? 1 : cumulativeAt(x, p, i);
+          const next = i === p.K - 1 ? 0 : cumulativeAt(x, p, i + 1);
+          y = Math.max(0, prev - next);
+        }
+        data.push({ x: x, y: y });
+      }
+      const color = palette[i % palette.length];
+      const isModal = kind === 'response' && i === modal;
+      datasets.push({
+        label: kind === 'cumulative' ? 'P*'+sub(i + 1) : 'C'+sub(i + 1),
+        data: data,
+        borderColor: color,
+        backgroundColor: isModal ? color + '18' : 'transparent',
+        borderWidth: isModal ? 2.8 : 1.6,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: color,
+        tension: 0.25,
+        fill: isModal ? 'origin' : false,
+        order: isModal ? 0 : 1
+      });
+    }
+    chart.data.datasets = datasets;
+    chart.$params = { ...p };
+    chart.options.plugins.thetaMarker.value = p.theta;
+    chart.update('none');
+  }
+
+  function updateBarChart(p) {
+    if (!charts.distribution) return;
+    const probs = categoryProbs(p.theta, p);
+    let modal = 0;
+    probs.forEach((v, i) => { if (v > probs[modal]) modal = i; });
+
+    charts.distribution.data.labels = probs.map((_, i) => 'C' + sub(i + 1));
+    charts.distribution.data.datasets[0].data = probs.map(v => +v.toFixed(6));
+    charts.distribution.data.datasets[0].backgroundColor = probs.map((_, i) =>
+      i === modal ? palette[i % palette.length] : palette[i % palette.length] + '55');
+    charts.distribution.data.datasets[0].borderColor = probs.map((_, i) => palette[i % palette.length]);
+    charts.distribution.update('none');
+  }
+
+  /* ---------- 同步 UI ---------- */
+  function syncControls() {
+    ids.forEach(key => {
+      const el = $(key);
+      el.value = params[key];
+      const pct = ((params[key] - Number(el.min)) / (Number(el.max) - Number(el.min))) * 100;
+      el.style.setProperty('--pct', pct + '%');
+      $(key + '-val').textContent = Number(params[key]).toFixed(2);
+    });
+    $('k-select').value = params.K;
+    $('k-readout').textContent = params.K;
+  }
+
+  function update() {
+    syncControls();
+
+    const p = params;
+    const probs = categoryProbs(p.theta, p);
+    const gMin = gammaMin(p);
+    const satisfied = p.gamma > gMin;
+
+    let modal = 0;
+    probs.forEach((v, i) => { if (v > probs[modal]) modal = i; });
+    const expected = probs.reduce((acc, v, i) => acc + v * (i + 1), 0);
+    const normalized = p.K > 1 ? (expected - 1) / (p.K - 1) : 0;
+    const entropyRaw = probs.reduce((acc, v) => acc - (v > 1e-12 ? v * Math.log(v) : 0), 0);
+    const entropy = p.K > 1 ? entropyRaw / Math.log(p.K) : 0;
+
+    // 数值峰检测
+    const multi = [];
+    for (let k = 1; k <= p.K; k++) if (countPeaks(p, k) > 1) multi.push('C' + sub(k));
+
+    // 图表
+    updateLineChart(charts.cumulative, 'cumulative', p);
+    updateLineChart(charts.response, 'response', p);
+    updateBarChart(p);
+
+    // θ 标签
+    ['theta-tag-cum', 'theta-tag-resp', 'theta-tag-bar'].forEach(id => {
+      $(id).textContent = 'θ = ' + p.theta.toFixed(2);
+    });
+
+    // 诊断
+    $('gamma-min').textContent = gMin.toFixed(3);
+    $('constraint-line').textContent = p.gamma.toFixed(2) + (satisfied ? ' > ' : ' ≤ ') + gMin.toFixed(3);
+    $('diag-status').classList.toggle('violated', !satisfied);
+    $('constraint-badge').textContent = satisfied ? '✓ Unimodal' : '✕ Multi-modal';
+    $('modal-category').textContent = 'C' + sub(modal + 1);
+    $('peak-prob').textContent = probs[modal].toFixed(3);
+    $('expected-grade').textContent = expected.toFixed(3);
+    $('entropy-value').textContent = entropy.toFixed(3);
+
+    const peakEl = $('peak-list');
+    peakEl.textContent = multi.length ? multi.join(', ') : 'None';
+    peakEl.className = multi.length || !satisfied ? 'bad' : 'ok';
+    $('fix-btn').hidden = satisfied;
+
+    // 质量分数条
+    const clamped = Math.max(0, Math.min(1, normalized));
+    $('score-text').textContent = clamped.toFixed(3);
+    $('score-marker').style.left = (clamped * 100) + '%';
+    $('score-meter').setAttribute('aria-valuenow', clamped.toFixed(3));
+  }
+
+  /* ---------- 事件绑定 ---------- */
+  function markCustom() {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  }
+
+  buildCharts();
+
+  ids.forEach(key => {
+    $(key).addEventListener('input', e => {
+      params[key] = parseFloat(e.target.value);
+      markCustom();
+      requestAnimationFrame(update);
+    });
+  });
+
+  $('k-select').addEventListener('change', e => {
+    params.K = parseInt(e.target.value, 10);
+    markCustom();
+    update();
+  });
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.preset;
+      params = { ...presets[key] };
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b === btn));
+      update();
+    });
+  });
+
+  $('reset-btn').addEventListener('click', () => {
+    params = { ...defaults };
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === 'unimodal'));
+    update();
+  });
+
+  $('fix-btn').addEventListener('click', () => {
+    const need = gammaMin(params);
+    // 向上取整到 0.05 网格，并留出 10% 安全余量
+    let g = Math.ceil((need * 1.1 + 0.05) / 0.05) * 0.05;
+    params.gamma = Math.min(5, Math.max(0.1, +g.toFixed(2)));
+    markCustom();
+    update();
+  });
+
+  // 尊重减少动画偏好
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.documentElement.style.scrollBehavior = 'auto';
+  }
+
+  update();
+
+  // MathJax 渲染完成后无需重绘 Canvas（曲线为纯数值绘图）
+}
+
+/* ==========================================================================
+   3. PDF 高清渲染（PDF.js）
+   --------------------------------------------------------------------------
+   - 懒加载：进入视口附近才渲染，避免同时解码 5 个 PDF
+   - 支持：上一页 / 下一页 / 放大 / 缩小 / 适应宽度
+   - 高清：按 devicePixelRatio 渲染（上限 2），保证矢量级清晰度
+   - 兜底：PDF.js 不可用或跨域失败时，保留原生 iframe 预览
+   ========================================================================== */
+function initPDFFigures() {
+  const figures = Array.from(document.querySelectorAll('.paper-figure[data-pdf]'));
+  if (!figures.length) return;
+
+  if (window.pdfjsLib) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+
+  figures.forEach(figure => {
+    const state = {
+      pdf: null, page: 1, numPages: 1, zoom: 1,
+      busy: false, loaded: false, failed: false, renderTask: null
+    };
+    figure._pdfState = state;
+
+    const viewport = figure.querySelector('.pdf-viewport');
+    const stage = figure.querySelector('.pdf-stage');
+    const canvas = figure.querySelector('.pdf-stage canvas');
+    const overlay = figure.querySelector('.pdf-overlay');
+    const native = figure.querySelector('.pdf-native');
+    const controls = Array.from(figure.querySelectorAll('.pdf-ctrl'));
+    const indicator = figure.querySelector('.page-indicator:not(.zoom-label)');
+    const zoomLabel = figure.querySelector('.zoom-label');
+
+    function showOverlay(text, spinner) {
+      overlay.hidden = false;
+      overlay.innerHTML = '';
+      if (spinner) {
+        const s = document.createElement('div');
+        s.className = 'spinner';
+        overlay.appendChild(s);
+      }
+      const span = document.createElement('span');
+      span.textContent = text;
+      overlay.appendChild(span);
+    }
+
+    function useFallback(message) {
+      state.failed = true;
+      viewport.hidden = true;
+      native.hidden = false;
+      controls.forEach(c => { c.hidden = true; });
+      let note = figure.querySelector('.pdf-note');
+      if (!note) {
+        note = document.createElement('div');
+        note.className = 'pdf-note';
+        figure.querySelector('.pdf-body').appendChild(note);
+      }
+      note.textContent = message ||
+        'Inline PDF rendering unavailable — showing native browser preview. Serve this page over HTTP for high-resolution rendering.';
+    }
+
+    async function drawPage() {
+      if (!state.pdf || state.busy) return;
+      state.busy = true;
+      try {
+        const page = await state.pdf.getPage(state.page);
+        const base = page.getViewport({ scale: 1 });
+        const cssWidth = Math.max(280, stage.clientWidth);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const scale = (cssWidth / base.width) * state.zoom;
+        const vp = page.getViewport({ scale: scale * dpr });
+
+        canvas.width = Math.floor(vp.width);
+        canvas.height = Math.floor(vp.height);
+        canvas.style.width = (vp.width / dpr) + 'px';
+        canvas.style.height = (vp.height / dpr) + 'px';
+
+        const ctx = canvas.getContext('2d');
+        if (state.renderTask) { try { state.renderTask.cancel(); } catch (_) {} }
+        state.renderTask = page.render({ canvasContext: ctx, viewport: vp });
+        await state.renderTask.promise;
+
+        overlay.hidden = true;
+        indicator.textContent = state.page + ' / ' + state.numPages;
+        zoomLabel.textContent = Math.round(state.zoom * 100) + '%';
+
+        const prev = figure.querySelector('[data-action="prev"]');
+        const next = figure.querySelector('[data-action="next"]');
+        if (prev) prev.disabled = state.page <= 1;
+        if (next) next.disabled = state.page >= state.numPages;
+      } catch (err) {
+        if (err && err.name === 'RenderingCancelledException') return;
+        console.warn('[PDF render]', figure.dataset.pdf, err);
+        useFallback();
+      } finally {
+        state.busy = false;
+      }
+    }
+
+    async function load() {
+      if (state.loaded || state.failed) return;
+      state.loaded = true;
+
+      // 【新增】检测 file:// 协议，直接降级为原生预览
+      if (window.location.protocol === 'file:') {
+        useFallback('检测到您正在使用 file:// 协议直接打开文件。PDF.js 需要 HTTP 服务器才能加载本地 PDF。已为您切换为浏览器原生预览。建议通过本地服务器（如 python -m http.server）访问以获得高清渲染、翻页和缩放体验。');
+        return;
+      }
+
+      if (!window.pdfjsLib) { useFallback(); return; }
+
+      showOverlay('Rendering PDF…', true);
+      try {
+        const task = window.pdfjsLib.getDocument({
+          url: figure.dataset.pdf,
+          cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+          cMapPacked: true,
+          withCredentials: false
+        });
+        const pdf = await task.promise;
+        state.pdf = pdf;
+        state.numPages = pdf.numPages;
+        state.page = 1;
+
+        native.hidden = true;
+        viewport.hidden = false;
+        controls.forEach(c => { c.hidden = false; });
+
+        await drawPage();
+
+        if ('ResizeObserver' in window) {
+          let raf = null;
+          const ro = new ResizeObserver(() => {
+            if (state.failed) return;
+            if (raf) cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(() => { if (!state.busy) drawPage(); });
+          });
+          ro.observe(stage);
+        } else {
+          window.addEventListener('resize', () => { if (!state.busy && !state.failed) drawPage(); });
+        }
+      } catch (err) {
+        console.warn('[PDF load]', figure.dataset.pdf, err);
+        // 优化错误提示：区分真正的文件缺失和网络/CORS错误
+        const isMissing = err && (err.name === 'MissingPDFException' || err.status === 404);
+        if (isMissing) {
+          viewport.hidden = false;
+          native.hidden = true;
+          controls.forEach(c => { c.hidden = true; });
+          showOverlay('PDF 文件未找到: ' + figure.dataset.pdf + '。请检查 figures/ 目录下是否存在该文件。', false);
+        } else {
+          useFallback('PDF 加载失败（可能是网络问题或跨域限制）。已切换为浏览器原生预览。');
+        }
+      }
+    }
+
+    /* 控件事件 */
+    figure.querySelector('.figure-tools').addEventListener('click', async e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn || !state.pdf || state.failed) return;
+      const action = btn.dataset.action;
+
+      if (action === 'prev' && state.page > 1) state.page--;
+      else if (action === 'next' && state.page < state.numPages) state.page++;
+      else if (action === 'zoom-in') state.zoom = Math.min(3, +(state.zoom + 0.25).toFixed(2));
+      else if (action === 'zoom-out') state.zoom = Math.max(0.5, +(state.zoom - 0.25).toFixed(2));
+      else if (action === 'fit') state.zoom = 1;
+      else return;
+
+      await drawPage();
+    });
+
+    /* 懒加载 */
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) { load(); io.unobserve(figure); }
+        });
+      }, { rootMargin: '300px 0px', threshold: 0.01 });
+      io.observe(figure);
+    } else {
+      load();
+    }
+  });
+}
+</script>
+
+</body>
+</html>
